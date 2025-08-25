@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notion图片点击特效</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            background: transparent;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 800px;
+            width: 100%;
+        }
+        
+        .image-card {
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .image-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+        }
+        
+        .image-container {
+            position: relative;
+            width: 100%;
+            cursor: pointer;
+        }
+        
+        .image-container img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+        
+        .image-info {
+            padding: 16px;
+        }
+        
+        .image-info h3 {
+            font-size: 1.2rem;
+            margin-bottom: 8px;
+            color: #2d3436;
+        }
+        
+        .image-info p {
+            color: #636e72;
+            margin-bottom: 12px;
+            font-size: 0.9rem;
+        }
+        
+        .like-count {
+            display: flex;
+            align-items: center;
+            color: #636e72;
+            font-size: 0.9rem;
+        }
+        
+        .heart-icon {
+            margin-right: 5px;
+            color: #e84393;
+        }
+        
+        /* 点击特效 */
+        .heart-emoji {
+            position: absolute;
+            font-size: 24px;
+            pointer-events: none;
+            z-index: 10;
+            animation: floatUp 1s ease-out forwards;
+        }
+        
+        @keyframes floatUp {
+            0% {
+                opacity: 1;
+                transform: translate(0, 0) scale(1);
+            }
+            50% {
+                opacity: 0.8;
+                transform: translate(0, -20px) scale(1.2);
+            }
+            100% {
+                opacity: 0;
+                transform: translate(0, -40px) scale(1.5);
+            }
+        }
+        
+        .notification {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: white;
+            padding: 12px 20px;
+            border-radius: 30px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            animation: slideIn 0.5s ease;
+            z-index: 100;
+        }
+        
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(100px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        
+        .notification.hidden {
+            display: none;
+        }
+        
+        .close-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.1);
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        @media (max-width: 600px) {
+            body {
+                padding: 10px;
+            }
+            
+            .image-info {
+                padding: 12px;
+            }
+            
+            .image-info h3 {
+                font-size: 1.1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="image-card">
+            <div class="image-container" id="notionImage">
+                <img src="https://images.unsplash.com/photo-1506744038136-46273834b3fb" alt="美丽风景">
+                <div class="close-btn" id="closeBtn">×</div>
+            </div>
+            <div class="image-info">
+                <h3>点击图片任何位置</h3>
+                <p>点击图片任意位置会出现爱心特效并记录点赞数</p>
+                <div class="like-count">
+                    <span class="heart-icon">❤️</span>
+                    <span id="likeCount">0</span> 次点赞
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="notification hidden" id="notification">
+        <span>感谢您的点赞！</span>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const imageContainer = document.getElementById('notionImage');
+            const likeCountElement = document.getElementById('likeCount');
+            const notification = document.getElementById('notification');
+            const closeBtn = document.getElementById('closeBtn');
+            
+            let likeCount = 0;
+            
+            // 从本地存储加载点赞数
+            if (localStorage.getItem('likeCount')) {
+                likeCount = parseInt(localStorage.getItem('likeCount'));
+                likeCountElement.textContent = likeCount;
+            }
+            
+            // 图片点击事件
+            imageContainer.addEventListener('click', function(e) {
+                // 防止点击关闭按钮时触发
+                if (e.target !== closeBtn) {
+                    createHeart(e.offsetX, e.offsetY);
+                    updateLikeCount();
+                    showNotification();
+                }
+            });
+            
+            // 关闭通知
+            closeBtn.addEventListener('click', function() {
+                imageContainer.querySelectorAll('.heart-emoji').forEach(heart => {
+                    heart.remove();
+                });
+            });
+            
+            // 创建爱心元素
+            function createHeart(x, y) {
+                const heart = document.createElement('div');
+                heart.classList.add('heart-emoji');
+                heart.innerHTML = '❤️';
+                heart.style.left = `${x}px`;
+                heart.style.top = `${y}px`;
+                
+                imageContainer.appendChild(heart);
+                
+                // 动画结束后移除元素
+                setTimeout(() => {
+                    if (heart.parentNode) {
+                        heart.remove();
+                    }
+                }, 1000);
+            }
+            
+            // 更新点赞计数
+            function updateLikeCount() {
+                likeCount++;
+                likeCountElement.textContent = likeCount;
+                localStorage.setItem('likeCount', likeCount);
+            }
+            
+            // 显示通知
+            function showNotification() {
+                notification.classList.remove('hidden');
+                
+                // 3秒后隐藏通知
+                setTimeout(() => {
+                    notification.classList.add('hidden');
+                }, 3000);
+            }
+        });
+    </script>
+</body>
+</html>
